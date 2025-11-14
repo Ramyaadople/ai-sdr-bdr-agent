@@ -64,7 +64,7 @@ with st.sidebar:
     
     apis = [
         ("Bright Data", "BRIGHT_DATA_API_TOKEN", "🌐"),
-        ("OpenAI", "OPENAI_API_KEY", "🧠"),
+        ("Azure API", "AZURE_API_KEY", "🧠"),
         ("HubSpot CRM", "HUBSPOT_API_KEY", "📊")
     ]
     
@@ -99,7 +99,7 @@ with col1:
     st.subheader("🚀 AI Prospecting Workflow")
     
     if st.button("Start Multi-Agent Prospecting", type="primary", use_container_width=True):
-        required_keys = ["BRIGHT_DATA_API_TOKEN", "OPENAI_API_KEY"]
+        required_keys = ["BRIGHT_DATA_API_TOKEN", "AZURE_OPENAI_API_KEY"]
         missing_keys = [key for key in required_keys if not os.getenv(key)]
         
         if missing_keys:

@@ -2,7 +2,7 @@ from crewai import Agent, Task
 from crewai.tools import BaseTool
 from typing import Any, List
 from pydantic import BaseModel, Field
-import openai
+from openai import AzureOpenAI
 import os
 
 class MessageGenerationInput(BaseModel):
@@ -17,7 +17,11 @@ class MessageGenerationTool(BaseTool):
     
     def __init__(self):
         super().__init__()
-        self.client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        self.client = AzureOpenAI(
+            api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+            azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+            api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-08-01-preview")
+        )
     
     def _run(self, companies, message_type="cold_email") -> list:
         # Ensure companies is a list
@@ -90,7 +94,7 @@ SUBJECT: [subject line]
 BODY: [email body]"""
 
         response = self.client.chat.completions.create(
-            model="gpt-4",
+            model=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME"),
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7,
             max_tokens=300
@@ -107,7 +111,7 @@ Context: {context.get('primary_trigger', {}).get('description', '')}
 Be professional, reference their company activity, no direct sales pitch."""
 
         response = self.client.chat.completions.create(
-            model="gpt-4",
+            model=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME"),
             messages=[{"role": "user", "content": prompt}],
             temperature=0.7,
             max_tokens=100
