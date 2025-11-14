@@ -11,6 +11,8 @@ load_dotenv()
 
 class BrightDataMCP:
     def __init__(self):
+        # with open('mcpServers.json', 'r') as f:
+        #     config = json.load(f)
         """Initialize BrightData client with MCP integration."""
         self.server_params = StdioServerParameters(
             command="npx",
@@ -22,6 +24,70 @@ class BrightDataMCP:
             },
         )
         print("✅ BrightData MCP client initialized")
+
+    def _call_tool_by_name(self, name: str, **kwargs):
+        """Call an MCP tool by name and return the result."""
+        from mcpadapt.crewai_adapter import CrewAIAdapter
+
+        with MCPAdapt(self.server_params, CrewAIAdapter()) as mcp_tools:
+            for tool in mcp_tools:
+                try:
+                    tool_name = getattr(tool, 'name', str(tool))
+                except Exception:
+                    tool_name = str(tool)
+
+                if tool_name == name:
+                    return tool.run(**kwargs)
+
+        raise RuntimeError(f"MCP tool not found: {name}")
+
+    @property
+    def tools(self):
+        """Provide a mapping-like proxy so callers can do `mcp.tools["name"](...)`.
+
+        This returns a lightweight proxy object whose `__getitem__` returns a
+        callable that invokes the named MCP tool on-demand.
+        """
+        parent = self
+
+        class _ToolsProxy:
+            def __getitem__(self, key):
+                return lambda **kwargs: parent._call_tool_by_name(key, **kwargs)
+
+        return _ToolsProxy()
+
+    @property
+    def client(self):
+        """Provide async access to MCP tools directly.
+
+        Usage: await mcp.client.call_tool("tool_name", {"arg": "value"})
+        """
+        from mcp.client.stdio import stdio_client
+        from mcp.client.session import ClientSession
+
+        parent = self
+
+        class _MCPClientProxy:
+            async def call_tool(self, name: str, arguments: dict):
+                """Call an MCP tool asynchronously and return the result."""
+                # Build combined environment
+                import os
+                env = os.environ.copy()
+                if parent.server_params and parent.server_params.env:
+                    env.update(parent.server_params.env)
+                    parent.server_params.env = env
+
+                # Connect directly without wrapping in MCPAdapt context manager
+                async with stdio_client(parent.server_params) as (read, write):
+                    async with ClientSession(read, write) as session:
+                        await session.initialize()
+                        result = await session.call_tool(name, arguments)
+                        try:
+                            return result.model_dump()
+                        except Exception:
+                            return result
+
+        return _MCPClientProxy()
     
     def scrape_company_linkedin(self, company_name):
         """Scrape LinkedIn for hiring activity and posts using Bright Data MCP."""
@@ -153,13 +219,49 @@ class BrightDataMCP:
     
     def _parse_mcp_results(self, mcp_result):
         """Parse MCP tool results into expected format."""
+        import json
+        
         try:
-            if isinstance(mcp_result, dict) and 'results' in mcp_result:
-                print(f"🔍 MCP returned {len(mcp_result['results'])} results")
-                return mcp_result
+            # Handle CallToolResult with nested content
+            if isinstance(mcp_result, dict):
+                if 'content' in mcp_result and isinstance(mcp_result['content'], list):
+                    # MCP standard response: content is a list of text/structured items
+                    for item in mcp_result['content']:
+                        if isinstance(item, dict) and item.get('type') == 'text':
+                            text_content = item.get('text', '')
+                            try:
+                                parsed = json.loads(text_content)
+                                if isinstance(parsed, dict) and 'organic' in parsed:
+                                    # Search engine response with organic results
+                                    results = parsed['organic']
+                                    # Normalize to expected format
+                                    normalized = []
+                                    for r in results:
+                                        normalized.append({
+                                            'title': r.get('title', ''),
+                                            'url': r.get('link', ''),
+                                            'snippet': r.get('description', ''),
+                                            'rank': r.get('rank')
+                                        })
+                                    print(f"🔍 MCP returned {len(normalized)} results from organic search")
+                                    return {'results': normalized}
+                            except (json.JSONDecodeError, ValueError):
+                                pass
+                
+                # Fallback: check for top-level results key
+                if 'results' in mcp_result:
+                    print(f"🔍 MCP returned {len(mcp_result['results'])} results")
+                    return mcp_result
+                
+                # Last resort: return as-is if it looks like results
+                if mcp_result:
+                    print(f"🔍 MCP returned dict with keys: {list(mcp_result.keys())}")
+                    return {'results': [mcp_result]}
+            
             elif isinstance(mcp_result, list):
                 print(f"🔍 MCP returned {len(mcp_result)} results as list")
                 return {'results': mcp_result}
+            
             elif isinstance(mcp_result, str):
                 if mcp_result.strip().startswith('<') or 'html' in mcp_result.lower():
                     return self._parse_html_search_results(mcp_result)
