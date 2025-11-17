@@ -18,7 +18,7 @@ class BrightDataMCP:
             command="npx",
             args=["@brightdata/mcp"],
             env={
-                "API_TOKEN": os.getenv("BRIGHT_DATA_API_TOKEN"),
+                "API_TOKEN": os.getenv("API_TOKEN"),
                 "WEB_UNLOCKER_ZONE": os.getenv("WEB_UNLOCKER_ZONE", "mcp_unlocker"),
                 "BROWSER_ZONE": os.getenv("BROWSER_ZONE", "scraping_browser1"),
             },

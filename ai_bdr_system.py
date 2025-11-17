@@ -63,8 +63,8 @@ with st.sidebar:
     st.subheader("🔗 API Status")
     
     apis = [
-        ("Bright Data", "BRIGHT_DATA_API_TOKEN", "🌐"),
-        ("Azure API", "AZURE_API_KEY", "🧠"),
+        ("Bright Data", "API_TOKEN", "🌐"),
+        ("Open AI api key", "OPENAI_API_KEY", "🧠"),
         ("HubSpot CRM", "HUBSPOT_API_KEY", "📊")
     ]
     
@@ -83,7 +83,7 @@ with st.sidebar:
                     1. Get credentials from Bright Data dashboard
                     2. Update .env file with:
                        ```
-                       BRIGHT_DATA_API_TOKEN=your_password
+                       API_TOKEN=your_password
                        WEB_UNLOCKER_ZONE=lum-customer-username-zone-zonename
                        ```
                     3. See BRIGHT_DATA_SETUP.md for detailed guide
@@ -99,7 +99,7 @@ with col1:
     st.subheader("🚀 AI Prospecting Workflow")
     
     if st.button("Start Multi-Agent Prospecting", type="primary", use_container_width=True):
-        required_keys = ["BRIGHT_DATA_API_TOKEN", "AZURE_OPENAI_API_KEY"]
+        required_keys = ["API_TOKEN", "OPENAI_API_KEY"]
         missing_keys = [key for key in required_keys if not os.getenv(key)]
         
         if missing_keys:
